@@ -37,11 +37,11 @@ interface MorphoVaultPosition {
       decimals: number;
     };
     state: {
-      netApy: number;
+      apy: number;
     };
   };
-  totalAssets: string;
-  totalAssetsUsd: number;
+  assets: string;
+  assetsUsd: number;
 }
 
 interface AaveReserve {
@@ -76,8 +76,9 @@ interface AaveMarket {
 }
 
 const MORPHO_USER_POSITIONS_QUERY = `
-  query GetUserPositions($address: String!, $chainId: Int!) {
-    user(address: $address, chainId: $chainId) {
+  query GetUserPositions($chainId: Int!, $address: String!) {
+    userByAddress(chainId: $chainId, address: $address) {
+      address
       vaultPositions {
         vault {
           address
@@ -89,11 +90,11 @@ const MORPHO_USER_POSITIONS_QUERY = `
             decimals
           }
           state {
-            netApy
+            apy
           }
         }
-        totalAssets
-        totalAssetsUsd
+        assets
+        assetsUsd
       }
     }
   }
@@ -149,13 +150,13 @@ export async function GET(request: Request) {
       fetch(MORPHO_API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: MORPHO_USER_POSITIONS_QUERY,
-          variables: {
-            address: userAddress.toLowerCase(),
-            chainId: BASE_CHAIN_ID,
-          },
-        }),
+          body: JSON.stringify({
+            query: MORPHO_USER_POSITIONS_QUERY,
+            variables: {
+              chainId: BASE_CHAIN_ID,
+              address: userAddress,
+            },
+          }),
         next: { revalidate: 60 }, // Cache for 1 minute
       }).catch((error) => {
         console.error("Error fetching Morpho positions:", error);
@@ -188,7 +189,7 @@ export async function GET(request: Request) {
       if (morphoData.errors) {
         console.error("Morpho GraphQL errors:", morphoData.errors);
       } else {
-        const vaultPositions = (morphoData.data?.user?.vaultPositions ||
+        const vaultPositions = (morphoData.data?.userByAddress?.vaultPositions ||
           []) as MorphoVaultPosition[];
 
         vaultPositions
@@ -198,8 +199,9 @@ export async function GET(request: Request) {
               USDC_BASE_ADDRESS.toLowerCase()
           )
           .forEach((pos) => {
-            const apy = pos.vault.state.netApy;
-            const estimatedYearlyYield = pos.totalAssetsUsd * apy;
+            const apy = pos.vault.state.apy;
+            const apyPercentage = apy < 1 ? apy * 100 : apy;
+            const estimatedYearlyYield = pos.assetsUsd * (apy < 1 ? apy : apy / 100);
 
             allPositions.push({
               id: `morpho:${pos.vault.address}`,
@@ -208,14 +210,14 @@ export async function GET(request: Request) {
               vaultName: pos.vault.name,
               asset: pos.vault.asset,
               deposited: {
-                amount: pos.totalAssets,
+                amount: pos.assets,
                 formatted: (
-                  parseFloat(pos.totalAssets) /
+                  parseFloat(pos.assets) /
                   Math.pow(10, pos.vault.asset.decimals)
                 ).toFixed(2),
-                usd: pos.totalAssetsUsd,
+                usd: pos.assetsUsd,
               },
-              currentApy: apy,
+              currentApy: apyPercentage,
               estimatedYearlyYield,
             });
           });
@@ -262,6 +264,7 @@ export async function GET(request: Request) {
 
           // If user has collateral in this market, create a position
           if (totalCollateral > 0) {
+            const apyPercentage = netAPY < 1 ? netAPY * 100 : netAPY;
             const estimatedYearlyYield = netWorth * netAPY;
 
             allPositions.push({
@@ -275,7 +278,7 @@ export async function GET(request: Request) {
                 formatted: totalCollateral.toFixed(2),
                 usd: totalCollateral,
               },
-              currentApy: netAPY,
+              currentApy: apyPercentage,
               estimatedYearlyYield,
             });
           }
@@ -295,6 +298,24 @@ export async function GET(request: Request) {
     const weightedAverageApy =
       totalDeposited > 0 ? totalEstimatedYearlyYield / totalDeposited : 0;
 
+    // Convert APY to percentage (if it's in decimal format like 0.053)
+    const weightedAvgApyPercentage = weightedAverageApy < 1 
+      ? weightedAverageApy * 100 
+      : weightedAverageApy;
+
+    console.log(`📊 User ${userAddress} positions:`, {
+      totalDeposited,
+      positionCount: allPositions.length,
+      weightedAverageApy,
+      weightedAvgApyPercentage,
+      positions: allPositions.map(p => ({
+        protocol: p.protocol,
+        amount: p.deposited.usd,
+        apyRaw: p.currentApy,
+        apyFormatted: `${p.currentApy.toFixed(2)}%`,
+      }))
+    });
+
     return NextResponse.json({
       success: true,
       address: userAddress,
@@ -302,7 +323,7 @@ export async function GET(request: Request) {
       summary: {
         totalDeposited,
         totalEstimatedYearlyYield,
-        weightedAverageApy,
+        weightedAvgApy: weightedAvgApyPercentage,
         positionCount: allPositions.length,
         byProtocol: {
           morpho: {

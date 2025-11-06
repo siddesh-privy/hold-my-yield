@@ -21,8 +21,6 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    console.log(`Initial deposit request for ${walletAddress}: ${balanceNum} USDC`);
-
     // Get best available vault
     const vaultsResponse = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/vaults`
@@ -38,8 +36,6 @@ export async function POST(request: Request) {
 
     const bestVault = vaultsData.vaults[0]; // Highest APY vault
 
-    console.log(`Best vault: ${bestVault.name} (${(bestVault.netApy * 100).toFixed(2)}% APY)`);
-
     // Execute initial deposit
     const result = await initialDeposit(walletId, walletAddress, usdcBalance, {
       protocol: bestVault.protocol,
@@ -47,7 +43,6 @@ export async function POST(request: Request) {
     });
 
     if (result.success) {
-      console.log(`✅ Initial deposit successful: ${result.txHash}`);
       return NextResponse.json({
         success: true,
         txHash: result.txHash,
@@ -58,7 +53,6 @@ export async function POST(request: Request) {
         },
       });
     } else {
-      console.error(`❌ Initial deposit failed: ${result.error}`);
       return NextResponse.json({
         success: false,
         error: result.error,

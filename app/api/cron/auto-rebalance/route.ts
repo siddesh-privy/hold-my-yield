@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
+import { kv } from "@/lib/kv";
 import {
   canRebalance,
   evaluateRebalanceOpportunity,
@@ -81,11 +81,69 @@ export async function GET(request: Request) {
               return;
             }
 
+            // Fetch user positions
             const positionsResponse = await fetch(
               `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/user/positions?address=${address}`
             );
             const positionsData = await positionsResponse.json();
 
+            // Get wallet ID from linked accounts
+            const privyResponse = await fetch(
+              `https://api.privy.io/v1/users/${address}`,
+              {
+                headers: {
+                  "Authorization": `Basic ${btoa(`${process.env.NEXT_PUBLIC_PRIVY_APP_ID}:${process.env.PRIVY_APP_SECRET}`)}`,
+                },
+              }
+            );
+            
+            let walletId: string | undefined;
+            if (privyResponse.ok) {
+              const userData = await privyResponse.json();
+              const embeddedWalletAccount = userData.linkedAccounts?.find(
+                (account: any) => account.type === "wallet" && account.address?.toLowerCase() === (address as string).toLowerCase()
+              );
+              walletId = embeddedWalletAccount?.id;
+            }
+
+            // Check if user has wallet balance to deposit
+            if (walletId) {
+              const balanceResponse = await fetch(
+                `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/user/balance?walletId=${walletId}`
+              );
+              const balanceData = await balanceResponse.json();
+
+              if (balanceData.success && balanceData.balance) {
+                const walletBalance = parseFloat(balanceData.balance.raw) / 1e6;
+                
+                // If wallet has > $1 USDC, create deposit opportunity
+                if (walletBalance >= 1) {
+                  console.log(`💵 ${address} has $${walletBalance.toFixed(2)} in wallet - creating deposit opportunity`);
+                  
+                  const depositOpportunity: RebalanceOpportunity = {
+                    address: address as string,
+                    walletId: walletId,
+                    fromProtocol: "wallet" as any, // Special case for wallet deposits
+                    fromVault: "wallet",
+                    toProtocol: bestVault.protocol,
+                    toVault: bestVault.address || bestVault.marketAddress,
+                    amountUsd: walletBalance,
+                    amountRaw: balanceData.balance.raw,
+                    currentApy: 0, // No yield in wallet
+                    targetApy: bestVault.netApy,
+                    apyDiff: bestVault.netApy,
+                    expectedYearlyGain: walletBalance * bestVault.netApy,
+                    priority: 1000, // High priority for deposits
+                    timestamp: Date.now(),
+                  };
+
+                  await addToRebalanceQueue(depositOpportunity);
+                  opportunitiesFound++;
+                }
+              }
+            }
+
+            // Check existing positions for rebalancing
             if (!positionsData.success || !positionsData.positions || positionsData.positions.length === 0) {
               return;
             }
@@ -100,7 +158,7 @@ export async function GET(request: Request) {
 
               if (evaluation.shouldRebalance && evaluation.opportunity) {
                 evaluation.opportunity.address = address as string;
-                evaluation.opportunity.walletId = positionsData.walletId || address;
+                evaluation.opportunity.walletId = walletId || address as string;
 
                 console.log(
                   `💰 Opportunity for ${address}: ` +
@@ -152,7 +210,24 @@ export async function GET(request: Request) {
         console.log(`  Amount: $${job.amountUsd.toLocaleString()}`);
         console.log(`  APY: ${(job.currentApy * 100).toFixed(2)}% → ${(job.targetApy * 100).toFixed(2)}%`);
 
-        const result = await executeRebalance(job);
+        // Handle wallet deposits (from wallet to vault)
+        let result;
+        if (job.fromProtocol === "wallet" && job.fromVault === "wallet") {
+          // This is a deposit from wallet, use the initial deposit logic
+          const { initialDeposit } = await import("@/lib/rebalance-executor");
+          result = await initialDeposit(
+            job.walletId,
+            job.address,
+            job.amountRaw,
+            {
+              protocol: job.toProtocol,
+              address: job.toVault,
+            }
+          );
+        } else {
+          // Normal rebalance between vaults
+          result = await executeRebalance(job);
+        }
 
         await logRebalanceHistory(job, result);
 

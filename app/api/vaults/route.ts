@@ -104,8 +104,8 @@ export async function GET(request: Request) {
       }
     });
 
-    // Sort by totalAssetsUsd (highest liquidity first)
-    allVaults.sort((a, b) => b.totalAssetsUsd - a.totalAssetsUsd);
+    // Sort by netApy (highest yield first)
+    allVaults.sort((a, b) => b.netApy - a.netApy);
 
     return NextResponse.json({
       success: true,

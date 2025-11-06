@@ -6,12 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:local": "./scripts/test-local.sh",
+    "redis:start": "docker-compose up -d",
+    "redis:stop": "docker-compose down",
+    "redis:cli": "docker exec -it hold-my-yield-redis redis-cli",
+    "redis:logs": "docker logs -f hold-my-yield-redis"
   },
   "dependencies": {
     "@privy-io/node": "^0.4.0",
     "@privy-io/react-auth": "^3.6.0",
+    "@upstash/redis": "^1.35.6",
     "@vercel/kv": "^3.0.0",
+    "ioredis": "^5.8.2",
     "next": "16.0.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
