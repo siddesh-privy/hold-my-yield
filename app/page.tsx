@@ -5,8 +5,9 @@ import {
   useSessionSigners,
   useWallets,
 } from "@privy-io/react-auth";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { base } from "viem/chains";
+import type { Vault } from "./api/vaults/route";
 
 export default function Home() {
   const { authenticated, ready, login, logout } = usePrivy();
@@ -67,6 +68,9 @@ function MainApp({ logout }: { logout: () => void }) {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawAddress, setWithdrawAddress] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [showVaultsModal, setShowVaultsModal] = useState(false);
+  const [vaults, setVaults] = useState<Vault[]>([]);
+  const [vaultsLoading, setVaultsLoading] = useState(true);
 
   const embeddedWallet = wallets.find(
     (wallet) => wallet.walletClientType === "privy"
@@ -108,6 +112,8 @@ function MainApp({ logout }: { logout: () => void }) {
         ],
       });
       // No need to update state - the wallet.delegated property will be updated
+      // Complete onboarding and show dashboard
+      completeOnboarding();
     } catch (error) {
       console.error("Failed to enable auto balancer:", error);
     }
@@ -158,6 +164,25 @@ function MainApp({ logout }: { logout: () => void }) {
     setWithdrawAddress("");
     setWithdrawAmount("");
   };
+
+  // Fetch available vaults
+  useEffect(() => {
+    const fetchVaults = async () => {
+      try {
+        const response = await fetch("/api/vaults");
+        const data = await response.json();
+        if (data.success) {
+          setVaults(data.vaults);
+        }
+      } catch (error) {
+        console.error("Failed to fetch vaults:", error);
+      } finally {
+        setVaultsLoading(false);
+      }
+    };
+
+    fetchVaults();
+  }, []);
 
   if (showOnboarding) {
     return (
@@ -250,6 +275,99 @@ function MainApp({ logout }: { logout: () => void }) {
 
   return (
     <>
+      {/* Vaults Modal */}
+      {showVaultsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-5 sm:p-6 border-b">
+              <div>
+                <h3 className="text-base sm:text-lg font-medium">
+                  Available Markets
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                  We automatically optimize across these markets
+                </p>
+              </div>
+              <button
+                onClick={() => setShowVaultsModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-5 sm:p-6">
+              {vaultsLoading ? (
+                <div className="text-center py-8 text-sm text-gray-500">
+                  Loading markets...
+                </div>
+              ) : vaults.length === 0 ? (
+                <div className="text-center py-8 text-sm text-gray-500">
+                  No markets available
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {vaults.map((vault) => (
+                    <div
+                      key={vault.id}
+                      className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full font-medium uppercase">
+                              {vault.protocol}
+                            </span>
+                            <h4 className="text-sm font-medium truncate">
+                              {vault.name}
+                            </h4>
+                          </div>
+                          <p className="text-xs text-gray-500 truncate">
+                            {vault.asset.symbol} • $
+                            {(vault.totalAssetsUsd / 1000000).toFixed(2)}M
+                            liquidity
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-medium text-green-600">
+                            {(vault.netApy * 100).toFixed(2)}%
+                          </div>
+                          <div className="text-xs text-gray-500">APY</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t p-4 sm:p-5 bg-gray-50">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
+                <span className="text-gray-500">
+                  Total Markets: {vaults.length}
+                </span>
+                <span className="text-gray-500">
+                  {vaults.filter((v) => v.protocol === "morpho").length} Morpho
+                  • {vaults.filter((v) => v.protocol === "aave-v3").length} Aave
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Withdraw Modal */}
       {showWithdrawModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -360,7 +478,7 @@ function MainApp({ logout }: { logout: () => void }) {
                   Dashboard
                 </h2>
                 <p className="text-sm sm:text-base text-gray-500">
-                  Manage your yield optimization
+                  Manage your assets and yields
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
@@ -411,8 +529,29 @@ function MainApp({ logout }: { logout: () => void }) {
               </div>
 
               <div className="border rounded-lg p-4 sm:p-5 space-y-2 sm:space-y-3">
-                <div className="text-xs sm:text-sm text-gray-500">
-                  Current Yield
+                <div className="flex items-center justify-between">
+                  <div className="text-xs sm:text-sm text-gray-500">
+                    Current Yield
+                  </div>
+                  <button
+                    onClick={() => setShowVaultsModal(true)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    title="View available markets"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </button>
                 </div>
                 <div className="text-2xl sm:text-3xl font-medium">0.00%</div>
               </div>
