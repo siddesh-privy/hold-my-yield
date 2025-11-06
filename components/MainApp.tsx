@@ -39,23 +39,15 @@ export function MainApp() {
   );
 
   // Get wallet info from user's linked accounts
-  console.log("User object:", user);
-  console.log("Embedded wallet:", embeddedWallet);
-  console.log("Linked accounts:", user?.linkedAccounts);
-
   const embeddedWalletAccount = user?.linkedAccounts?.find(
     (account) =>
       account.type === "wallet" && account.address === embeddedWallet?.address
   );
 
-  console.log("Found embedded wallet account:", embeddedWalletAccount);
-
   const walletId =
     embeddedWalletAccount && "id" in embeddedWalletAccount
       ? embeddedWalletAccount.id
       : undefined;
-
-  console.log("Extracted walletId:", walletId);
 
   const autoBalancerEnabled =
     embeddedWalletAccount &&
@@ -87,6 +79,14 @@ export function MainApp() {
           },
         ],
       });
+
+      // Register user for auto-balancing
+      await fetch("/api/user/register-auto-balance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: embeddedWallet.address }),
+      });
+
       completeOnboarding();
     } catch (error) {
       console.error("Failed to enable auto balancer:", error);
@@ -99,6 +99,13 @@ export function MainApp() {
     try {
       await removeSessionSigners({
         address: embeddedWallet.address,
+      });
+
+      // Unregister user from auto-balancing
+      await fetch("/api/user/unregister-auto-balance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: embeddedWallet.address }),
       });
     } catch (error) {
       console.error("Failed to disable auto balancer:", error);
@@ -116,18 +123,6 @@ export function MainApp() {
   const completeOnboarding = () => {
     localStorage.setItem("onboarding_complete", "true");
     setShowOnboarding(false);
-  };
-
-  const handleWithdrawSubmit = async (address: string, amount: string) => {
-    if (!embeddedWallet?.address) return;
-
-    try {
-      // TODO: Implement USDC withdrawal transaction
-      console.log("Withdraw", amount, "USDC to", address);
-      setShowWithdrawModal(false);
-    } catch (error) {
-      console.error("Failed to withdraw:", error);
-    }
   };
 
   // Fetch available vaults
@@ -153,23 +148,16 @@ export function MainApp() {
   useEffect(() => {
     const fetchBalance = async () => {
       if (!walletId) {
-        console.log("No walletId found, skipping balance fetch");
         setBalanceLoading(false);
         return;
       }
 
-      console.log("Fetching balance for walletId:", walletId);
-
       try {
         const response = await fetch(`/api/user/balance?walletId=${walletId}`);
         const data = await response.json();
-        console.log("Balance API response:", data);
 
         if (data.success) {
-          console.log("Setting balance to:", data.balance.formatted);
           setWalletBalance(data.balance.formatted);
-        } else {
-          console.error("Balance API returned success=false:", data);
         }
       } catch (error) {
         console.error("Failed to fetch balance:", error);
@@ -208,7 +196,7 @@ export function MainApp() {
       {showWithdrawModal && (
         <WithdrawModal
           onClose={() => setShowWithdrawModal(false)}
-          onSubmit={handleWithdrawSubmit}
+          walletBalance={walletBalance}
         />
       )}
 

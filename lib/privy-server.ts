@@ -1,0 +1,10 @@
+import { PrivyClient } from "@privy-io/node";
+
+export const privyServer = new PrivyClient({
+  appId: process.env.NEXT_PUBLIC_PRIVY_APP_ID!,
+  appSecret: process.env.PRIVY_APP_SECRET!,
+});
+
+export const authorizationContext = {
+  authorization_private_keys: [process.env.PRIVY_AUTH_KEY!],
+};

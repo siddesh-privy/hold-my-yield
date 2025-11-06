@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 const MORPHO_API_URL = "https://api.morpho.org/graphql";
 const BASE_CHAIN_ID = 8453;
-const USDC_BASE_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // USDC on Base
+export const USDC_BASE_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // USDC on Base
 
 interface VaultAsset {
   address: string;
