@@ -136,7 +136,7 @@ export async function getTopRebalanceJobs(count: number = 5): Promise<RebalanceO
     rev: true, // Highest score first
   });
 
-  return items.map((item) => JSON.parse(item));
+  return items.map((item) => JSON.parse(item as string));
 }
 
 export async function removeFromQueue(opportunity: RebalanceOpportunity) {

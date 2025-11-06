@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     // Get recent history
     const history = await kv.lrange("rebalance_history", 0, limit - 1);
 
-    const parsedHistory = history.map((item) => JSON.parse(item)).map((entry) => ({
+    const parsedHistory = history.map((item) => JSON.parse(item as string)).map((entry) => ({
       ...entry,
       apyDiffPercent: `${(entry.apyDiff * 100).toFixed(2)}%`,
       expectedYearlyGain: `$${entry.expectedYearlyGain.toFixed(2)}`,

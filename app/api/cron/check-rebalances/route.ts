@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     console.log("🔍 Starting rebalance check...");
 
     // 1. Get all users with auto-balancer enabled
-    const users = await kv.smembers<string>("users:auto_balance_enabled");
+    const users = await kv.smembers("users:auto_balance_enabled");
     
     if (!users || users.length === 0) {
       console.log("No users with auto-balancer enabled");

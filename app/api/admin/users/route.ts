@@ -4,7 +4,7 @@ import { kv } from "@vercel/kv";
 export async function GET() {
   try {
     // Get all users with auto-balancer enabled
-    const users = await kv.smembers<string>("users:auto_balance_enabled");
+    const users = await kv.smembers("users:auto_balance_enabled");
 
     // Get additional stats for each user
     const usersWithStats = await Promise.all(
