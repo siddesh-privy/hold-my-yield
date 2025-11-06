@@ -3,12 +3,12 @@ import { kv } from "./kv";
 export interface RebalanceOpportunity {
   address: string;
   walletId: string;
-  positionId: string;
-  fromProtocol: "morpho" | "aave-v3";
+  positionId?: string; // Optional for wallet deposits
+  fromProtocol: "morpho" | "aave-v3" | "wallet"; // Added "wallet" for initial deposits
   fromVault: string;
   toProtocol: "morpho" | "aave-v3";
   toVault: string;
-  amount: string; // Raw USDC amount
+  amount: string; // Raw USDC amount (for compatibility)
   amountUsd: number;
   currentApy: number;
   targetApy: number;
@@ -137,10 +137,11 @@ export function evaluateRebalanceOpportunity(
 
 export async function addToRebalanceQueue(opportunity: RebalanceOpportunity) {
   // Add to sorted set (sorted by priority, higher = better)
-  await kv.zadd("rebalance_queue", {
-    score: opportunity.priority,
-    member: JSON.stringify(opportunity),
-  });
+  await kv.zadd(
+    "rebalance_queue",
+    opportunity.priority,
+    JSON.stringify(opportunity)
+  );
 }
 
 export async function getTopRebalanceJobs(

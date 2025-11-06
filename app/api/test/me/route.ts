@@ -35,6 +35,14 @@ export async function GET() {
     let decodedToken;
     try {
       const tokenToDecode = privyIdToken || privyToken;
+      
+      if (!tokenToDecode) {
+        return NextResponse.json({
+          error: "No token found",
+          message: "Try using the browser Network tab to find your address in API calls"
+        });
+      }
+      
       const base64Url = tokenToDecode.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
       const jsonPayload = decodeURIComponent(

@@ -72,18 +72,18 @@ export const kv = {
   },
 
   // Set operations
-  async sadd(key: string, ...members: string[]): Promise<number> {
+  async sadd(key: string, member: string): Promise<number> {
     if (isLocalMode && localRedis) {
-      return localRedis.sadd(key, ...members);
+      return localRedis.sadd(key, member);
     }
-    return vercelKV.sadd(key, ...members);
+    return vercelKV.sadd(key, member);
   },
 
-  async srem(key: string, ...members: string[]): Promise<number> {
+  async srem(key: string, member: string): Promise<number> {
     if (isLocalMode && localRedis) {
-      return localRedis.srem(key, ...members);
+      return localRedis.srem(key, member);
     }
-    return vercelKV.srem(key, ...members);
+    return vercelKV.srem(key, member);
   },
 
   async smembers(key: string): Promise<string[]> {
@@ -104,20 +104,21 @@ export const kv = {
   async zadd(
     key: string,
     score: number,
-    member: string,
-    ...args: (number | string)[]
+    member: string
   ): Promise<number> {
     if (isLocalMode && localRedis) {
-      return localRedis.zadd(key, score, member, ...args);
+      return localRedis.zadd(key, score, member);
     }
-    return vercelKV.zadd(key, { score, member }, ...args);
+    const result = await vercelKV.zadd(key, { score, member });
+    return result || 0;
   },
 
-  async zrem(key: string, ...members: string[]): Promise<number> {
+  async zrem(key: string, member: string): Promise<number> {
     if (isLocalMode && localRedis) {
-      return localRedis.zrem(key, ...members);
+      return localRedis.zrem(key, member);
     }
-    return vercelKV.zrem(key, ...members);
+    const result = await vercelKV.zrem(key, member);
+    return result || 0;
   },
 
   async zrange(
@@ -127,10 +128,15 @@ export const kv = {
     options?: { withScores?: boolean; rev?: boolean }
   ): Promise<string[]> {
     if (isLocalMode && localRedis) {
-      const args: any[] = [key, start, stop];
-      if (options?.rev) args.push("REV");
-      if (options?.withScores) args.push("WITHSCORES");
-      return localRedis.zrange(...args);
+      // ioredis zrange signature
+      if (options?.rev && options?.withScores) {
+        return localRedis.zrange(key, start, stop, "REV", "WITHSCORES") as Promise<string[]>;
+      } else if (options?.rev) {
+        return localRedis.zrange(key, start, stop, "REV") as Promise<string[]>;
+      } else if (options?.withScores) {
+        return localRedis.zrange(key, start, stop, "WITHSCORES") as Promise<string[]>;
+      }
+      return localRedis.zrange(key, start, stop) as Promise<string[]>;
     }
     return vercelKV.zrange(key, start, stop, options as any);
   },

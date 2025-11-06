@@ -123,12 +123,12 @@ export async function GET(request: Request) {
                   const depositOpportunity: RebalanceOpportunity = {
                     address: address as string,
                     walletId: walletId,
-                    fromProtocol: "wallet" as any, // Special case for wallet deposits
+                    fromProtocol: "wallet", // Special case for wallet deposits
                     fromVault: "wallet",
                     toProtocol: bestVault.protocol,
                     toVault: bestVault.address || bestVault.marketAddress,
                     amountUsd: walletBalance,
-                    amountRaw: balanceData.balance.raw,
+                    amount: balanceData.balance.raw, // Use 'amount' field instead of 'amountRaw'
                     currentApy: 0, // No yield in wallet
                     targetApy: bestVault.netApy,
                     apyDiff: bestVault.netApy,
@@ -218,7 +218,7 @@ export async function GET(request: Request) {
           result = await initialDeposit(
             job.walletId,
             job.address,
-            job.amountRaw,
+            job.amount, // Use 'amount' field
             {
               protocol: job.toProtocol,
               address: job.toVault,
