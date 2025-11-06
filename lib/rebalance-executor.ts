@@ -44,6 +44,7 @@ async function ensureUSDCApproval(
             chain_id: BASE_CHAIN_ID,
           },
         },
+        sponsor: true, // Privy sponsors gas fees
         authorization_context: authorizationContext,
       });
 
@@ -104,6 +105,7 @@ async function depositToMorpho(
             chain_id: BASE_CHAIN_ID,
           },
         },
+        sponsor: true, // Privy sponsors gas fees
         authorization_context: authorizationContext,
       });
 
@@ -160,6 +162,7 @@ async function withdrawFromMorpho(
             chain_id: BASE_CHAIN_ID,
           },
         },
+        sponsor: true, // Privy sponsors gas fees
         authorization_context: authorizationContext,
       });
 
@@ -224,6 +227,7 @@ async function depositToAave(
             chain_id: BASE_CHAIN_ID,
           },
         },
+        sponsor: true, // Privy sponsors gas fees
         authorization_context: authorizationContext,
       });
 
@@ -277,6 +281,7 @@ async function withdrawFromAave(
             chain_id: BASE_CHAIN_ID,
           },
         },
+        sponsor: true, // Privy sponsors gas fees
         authorization_context: authorizationContext,
       });
 

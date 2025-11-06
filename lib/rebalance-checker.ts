@@ -23,8 +23,8 @@ export const REBALANCE_CONFIG = {
   minTimeBetweenRebalances: 12 * 60 * 60 * 1000, // 12 hours in ms
   minProfitMultiplier: 3, // Expected gain must be 3x gas cost
   maxRebalancesPerDay: 2,
-  minPositionSize: 100, // $100 minimum
-  gasEstimate: 0.10, // $0.10 estimated gas cost on Base
+  minPositionSize: 1,
+  gasEstimate: 0.1,
 };
 
 export async function canRebalance(address: string): Promise<{
@@ -32,20 +32,25 @@ export async function canRebalance(address: string): Promise<{
   reason?: string;
 }> {
   // Check last rebalance time
-  const lastRebalanceTime = await kv.get<number>(`user:last_rebalance:${address}`);
+  const lastRebalanceTime = await kv.get<number>(
+    `user:last_rebalance:${address}`
+  );
   if (lastRebalanceTime) {
     const timeSince = Date.now() - lastRebalanceTime;
     if (timeSince < REBALANCE_CONFIG.minTimeBetweenRebalances) {
       return {
         allowed: false,
-        reason: `Too soon since last rebalance (${Math.round(timeSince / 1000 / 60)} min ago)`,
+        reason: `Too soon since last rebalance (${Math.round(
+          timeSince / 1000 / 60
+        )} min ago)`,
       };
     }
   }
 
   // Check daily rebalance count
   const today = new Date().toISOString().split("T")[0];
-  const dailyCount = await kv.get<number>(`user:rebalance_count:${address}:${today}`) || 0;
+  const dailyCount =
+    (await kv.get<number>(`user:rebalance_count:${address}:${today}`)) || 0;
   if (dailyCount >= REBALANCE_CONFIG.maxRebalancesPerDay) {
     return {
       allowed: false,
@@ -59,7 +64,11 @@ export async function canRebalance(address: string): Promise<{
 export function evaluateRebalanceOpportunity(
   position: any,
   bestVault: any
-): { shouldRebalance: boolean; opportunity?: RebalanceOpportunity; reason?: string } {
+): {
+  shouldRebalance: boolean;
+  opportunity?: RebalanceOpportunity;
+  reason?: string;
+} {
   const apyDiff = bestVault.netApy - position.currentApy;
 
   // Check minimum APY difference
@@ -91,14 +100,18 @@ export function evaluateRebalanceOpportunity(
   ) {
     return {
       shouldRebalance: false,
-      reason: `Not profitable enough (expected $${expectedGainBeforeNextRebalance.toFixed(2)} vs $${(REBALANCE_CONFIG.gasEstimate * REBALANCE_CONFIG.minProfitMultiplier).toFixed(2)} threshold)`,
+      reason: `Not profitable enough (expected $${expectedGainBeforeNextRebalance.toFixed(
+        2
+      )} vs $${(
+        REBALANCE_CONFIG.gasEstimate * REBALANCE_CONFIG.minProfitMultiplier
+      ).toFixed(2)} threshold)`,
     };
   }
 
   // Calculate priority score (higher = more important)
   const priority =
     expectedGainBeforeNextRebalance * 100 + // More profit = higher priority
-    (position.deposited.usd / 100) + // Larger positions = higher priority
+    position.deposited.usd / 100 + // Larger positions = higher priority
     apyDiff * 10000; // Better APY diff = higher priority
 
   const opportunity: RebalanceOpportunity = {
@@ -130,7 +143,9 @@ export async function addToRebalanceQueue(opportunity: RebalanceOpportunity) {
   });
 }
 
-export async function getTopRebalanceJobs(count: number = 5): Promise<RebalanceOpportunity[]> {
+export async function getTopRebalanceJobs(
+  count: number = 5
+): Promise<RebalanceOpportunity[]> {
   // Get top items from queue (highest priority first)
   const items = await kv.zrange("rebalance_queue", 0, count - 1, {
     rev: true, // Highest score first
@@ -149,7 +164,8 @@ export async function recordRebalance(address: string) {
 
   // Increment daily count
   const today = new Date().toISOString().split("T")[0];
-  const currentCount = await kv.get<number>(`user:rebalance_count:${address}:${today}`) || 0;
+  const currentCount =
+    (await kv.get<number>(`user:rebalance_count:${address}:${today}`)) || 0;
   await kv.set(`user:rebalance_count:${address}:${today}`, currentCount + 1, {
     ex: 86400, // Expire after 24 hours
   });
@@ -169,4 +185,3 @@ export async function logRebalanceHistory(
   await kv.lpush("rebalance_history", JSON.stringify(historyEntry));
   await kv.ltrim("rebalance_history", 0, 999);
 }
-

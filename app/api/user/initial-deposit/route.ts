@@ -12,12 +12,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if balance is sufficient (minimum $10)
+    // Check if balance is sufficient (minimum $1 for testing)
     const balanceNum = parseFloat(usdcBalance) / 1e6;
-    if (balanceNum < 10) {
+    if (balanceNum < 1) {
       return NextResponse.json({
         success: false,
-        error: "Insufficient balance (minimum $10 USDC required)",
+        error: "Insufficient balance (minimum $1 USDC required)",
       }, { status: 400 });
     }
 
