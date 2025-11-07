@@ -37,6 +37,7 @@ export function useAppActions() {
   const [closingPosition, setClosingPosition] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
+  const [isCheckingDelegation, setIsCheckingDelegation] = useState(true);
 
   // Computed values
   const embeddedWallet = wallets.find(
@@ -58,12 +59,24 @@ export function useAppActions() {
     "delegated" in embeddedWalletAccount &&
     embeddedWalletAccount.delegated === true;
 
+  // Once we have user data, wallet, and the account info with delegation status, we're done checking
+  useEffect(() => {
+    if (user && wallets.length > 0 && embeddedWalletAccount) {
+      // Make sure the account has the delegation property loaded
+      if ("delegated" in embeddedWalletAccount) {
+        setIsCheckingDelegation(false);
+      }
+    }
+  }, [user, wallets, embeddedWalletAccount]);
+
   // Show onboarding if auto balancer is not enabled (no session signers/delegation)
   // OR if ?onboarding=true is in the URL (for testing)
+  // But NOT if we're still checking delegation status
   const showOnboarding =
-    !autoBalancerEnabled ||
-    (typeof window !== "undefined" &&
-      window.location.search.includes("onboarding=true"));
+    !isCheckingDelegation &&
+    (!autoBalancerEnabled ||
+      (typeof window !== "undefined" &&
+        window.location.search.includes("onboarding=true")));
 
   // Methods
   const fetchBalance = async () => {
@@ -402,6 +415,7 @@ export function useAppActions() {
       closingPosition,
       transactions,
       transactionsLoading,
+      isCheckingDelegation,
     },
     actions: {
       setShowWithdrawModal,
