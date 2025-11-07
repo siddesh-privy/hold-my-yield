@@ -49,6 +49,9 @@ export function Dashboard({
               <p className="text-sm sm:text-base text-gray-500">
                 Manage your assets and yields
               </p>
+              <p className="text-xs text-gray-400 mt-1">
+                ⚡ Auto-rebalancing every 3 hours
+              </p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
               <button

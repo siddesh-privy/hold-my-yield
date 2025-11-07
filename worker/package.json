@@ -2,6 +2,7 @@
   "name": "hold-my-yield-worker",
   "version": "1.0.0",
   "description": "Background rebalancing worker for Hold My Yield",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

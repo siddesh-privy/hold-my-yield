@@ -1,5 +1,5 @@
-const { PrivyClient } = require("@privy-io/node");
-const { encodeFunctionData } = require("viem");
+import { PrivyClient } from "@privy-io/node";
+import { encodeFunctionData } from "viem";
 
 // Initialize Privy
 const privy = new PrivyClient({
@@ -927,6 +927,4 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-module.exports = {
-  checkAndRebalanceAllUsers,
-};
+export { checkAndRebalanceAllUsers };
