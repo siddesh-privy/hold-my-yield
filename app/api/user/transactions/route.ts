@@ -124,7 +124,7 @@ export async function GET(request: Request) {
             address: userAddress.toLowerCase(),
           },
         }),
-        next: { revalidate: 60 },
+        cache: "no-store",
       }).catch((error) => {
         console.error("Error fetching Morpho transactions:", error);
         return null;
@@ -141,7 +141,7 @@ export async function GET(request: Request) {
             chainId: BASE_CHAIN_ID,
           },
         }),
-        next: { revalidate: 60 },
+        cache: "no-store",
       }).catch((error) => {
         console.error("Error fetching Aave transactions:", error);
         return null;

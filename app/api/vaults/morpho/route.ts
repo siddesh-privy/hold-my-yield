@@ -81,7 +81,7 @@ export async function GET() {
           assetAddress: USDC_ADDRESS,
         },
       }),
-      next: { revalidate: 300 }, // Cache for 5 minutes
+      cache: "no-store",
     });
 
     const data = await response.json();
@@ -99,7 +99,7 @@ export async function GET() {
     const vaults = (data.data?.vaults?.items || []) as Vault[];
 
     const filteredVaults = vaults.filter(
-      (vault) =>
+        (vault) =>
         (vault.state?.apy || 0) >= 0.01 &&
         (vault.state?.totalAssetsUsd || 0) > 1000000
     );

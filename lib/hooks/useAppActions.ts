@@ -38,6 +38,12 @@ export function useAppActions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [isCheckingDelegation, setIsCheckingDelegation] = useState(true);
+  const [enablingAutoBalancer, setEnablingAutoBalancer] = useState(false);
+  const [autoBalancerJustEnabled, setAutoBalancerJustEnabled] = useState(false);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const [depositingToVault, setDepositingToVault] = useState(false);
+  const [waitingForDeposit, setWaitingForDeposit] = useState(false);
+  const [waitingForWithdrawal, setWaitingForWithdrawal] = useState(false);
 
   // Computed values
   const embeddedWallet = wallets.find(
@@ -69,14 +75,12 @@ export function useAppActions() {
     }
   }, [user, wallets, embeddedWalletAccount]);
 
-  // Show onboarding if auto balancer is not enabled (no session signers/delegation)
-  // OR if ?onboarding=true is in the URL (for testing)
-  // But NOT if we're still checking delegation status
+  // Show onboarding if:
+  // 1. Auto-balancer not enabled (new user), OR
+  // 2. Auto-balancer just enabled but onboarding not completed yet (stay until step 3)
   const showOnboarding =
     !isCheckingDelegation &&
-    (!autoBalancerEnabled ||
-      (typeof window !== "undefined" &&
-        window.location.search.includes("onboarding=true")));
+    (!autoBalancerEnabled || (autoBalancerJustEnabled && !onboardingCompleted));
 
   // Methods
   const fetchBalance = async () => {
@@ -122,6 +126,7 @@ export function useAppActions() {
   const handleEnableAutoBalancer = async () => {
     if (!embeddedWallet?.address) return;
 
+    setEnablingAutoBalancer(true);
     try {
       await addSessionSigners({
         address: embeddedWallet.address,
@@ -132,10 +137,15 @@ export function useAppActions() {
           },
         ],
       });
-      // Once session signers are added, autoBalancerEnabled will become true
-      // and onboarding will be automatically hidden
+      setAutoBalancerJustEnabled(true);
+      // Complete onboarding after enabling auto-balancer
+      setTimeout(() => {
+        setOnboardingCompleted(true);
+      }, 2000); // Give user time to see the success message
     } catch (error) {
       console.error("Failed to enable auto balancer:", error);
+    } finally {
+      setEnablingAutoBalancer(false);
     }
   };
 
@@ -173,41 +183,42 @@ export function useAppActions() {
       return;
     }
 
-    try {
-      const highestApyVault = vaults.reduce((highest, current) => {
-        return current.netApy > highest.netApy ? current : highest;
-      }, vaults[0]);
+    setDepositingToVault(true);
 
-      // Call deposit API
-      const response = await fetch("/api/vaults/deposit", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          walletId,
-          market: highestApyVault.protocol,
-          marketId: highestApyVault.marketAddress,
-          amount: walletBalance,
-          walletAddress: embeddedWallet.address,
-        }),
+    const highestApyVault = vaults.reduce((highest, current) => {
+      return current.netApy > highest.netApy ? current : highest;
+    }, vaults[0]);
+
+    // Start polling for deposit to appear
+    setWaitingForDeposit(true);
+
+    // Fire and forget - let the API call happen in background
+    fetch("/api/vaults/deposit", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        walletId,
+        market: highestApyVault.protocol,
+        marketId: highestApyVault.marketAddress,
+        amount: walletBalance,
+        walletAddress: embeddedWallet.address,
+      }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (!data.success) {
+          console.error("Deposit failed:", data);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to deposit to vault:", error);
+      })
+      .finally(() => {
+        setDepositingToVault(false);
       });
-
-      const data = await response.json();
-
-      if (data.success) {
-        await Promise.all([
-          fetchBalance(),
-          fetchUserPosition(true),
-          fetchTransactions(true),
-        ]);
-      } else {
-        console.error("Deposit failed:", data);
-      }
-    } catch (error) {
-      console.error("Failed to deposit to vault:", error);
-    }
   };
 
   const handleWithdrawSubmit = async (address: string, amount: string) => {
@@ -277,10 +288,11 @@ export function useAppActions() {
         throw new Error("Vault withdrawal failed");
       }
 
+      setWaitingForWithdrawal(true); // Start aggressive polling
       await Promise.all([
         fetchBalance(),
-        fetchUserPosition(true),
-        fetchTransactions(true),
+        fetchUserPosition(),
+        fetchTransactions(),
       ]);
 
       setTimeout(() => {
@@ -298,7 +310,7 @@ export function useAppActions() {
   useEffect(() => {
     const fetchVaults = async () => {
       try {
-        const response = await fetch("/api/vaults");
+        const response = await fetch("/api/vaults", { cache: "no-store" });
         const data = await response.json();
         if (data.success) {
           setVaults(data.vaults);
@@ -321,25 +333,24 @@ export function useAppActions() {
   // Fetch wallet balance
   useEffect(() => {
     fetchBalance();
-    // Refresh balance every 30 seconds
-    const interval = setInterval(fetchBalance, 30000);
+    // Refresh balance every 20 seconds
+    const interval = setInterval(fetchBalance, 20000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletId]);
 
   // Fetch user positions function
-  const fetchUserPosition = async (bustCache = false) => {
+  const fetchUserPosition = async () => {
     if (!embeddedWallet?.address) {
       setPositionLoading(false);
       return;
     }
 
     try {
-      const cacheBuster = bustCache ? `&t=${Date.now()}` : "";
       const response = await fetch(
-        `/api/user/positions?address=${embeddedWallet.address}${cacheBuster}`,
+        `/api/user/positions?address=${embeddedWallet.address}`,
         {
-          cache: bustCache ? "no-store" : "default",
+          cache: "no-store",
         }
       );
       const data = await response.json();
@@ -357,18 +368,17 @@ export function useAppActions() {
     }
   };
 
-  const fetchTransactions = async (bustCache = false) => {
+  const fetchTransactions = async () => {
     if (!embeddedWallet?.address) {
       setTransactionsLoading(false);
       return;
     }
 
     try {
-      const cacheBuster = bustCache ? `&t=${Date.now()}` : "";
       const response = await fetch(
-        `/api/user/transactions?address=${embeddedWallet.address}${cacheBuster}`,
+        `/api/user/transactions?address=${embeddedWallet.address}`,
         {
-          cache: bustCache ? "no-store" : "default",
+          cache: "no-store",
         }
       );
       const data = await response.json();
@@ -390,14 +400,72 @@ export function useAppActions() {
   useEffect(() => {
     fetchUserPosition();
     fetchTransactions();
-    // Refresh positions and transactions every 60 seconds
+    // Refresh positions and transactions every 20 seconds
     const interval = setInterval(() => {
       fetchUserPosition();
       fetchTransactions();
-    }, 60000);
+    }, 20000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embeddedWallet?.address]);
+
+  // Aggressive polling when waiting for deposit or withdrawal
+  useEffect(() => {
+    if (!waitingForDeposit && !waitingForWithdrawal) return;
+
+    // Capture initial position state
+    const initialPositionState = userPosition
+      ? JSON.stringify(userPosition)
+      : null;
+    const startTime = Date.now();
+    const POLL_DURATION = 30000; // 30 seconds
+
+    // Poll immediately on start
+    fetchBalance();
+    fetchUserPosition();
+    fetchTransactions();
+
+    const aggressiveInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+
+      // Stop after 30 seconds
+      if (elapsed >= POLL_DURATION) {
+        if (waitingForDeposit) setWaitingForDeposit(false);
+        if (waitingForWithdrawal) setWaitingForWithdrawal(false);
+        clearInterval(aggressiveInterval);
+        return;
+      }
+
+      // Check if position has changed
+      const currentPositionState = userPosition
+        ? JSON.stringify(userPosition)
+        : null;
+      if (initialPositionState !== currentPositionState) {
+        if (waitingForDeposit) setWaitingForDeposit(false);
+        if (waitingForWithdrawal) setWaitingForWithdrawal(false);
+        clearInterval(aggressiveInterval);
+        return;
+      }
+
+      // Continue polling
+      fetchBalance();
+      fetchUserPosition();
+      fetchTransactions();
+    }, 5000); // Poll every 5 seconds
+
+    // Timeout to ensure polling stops after 30 seconds
+    const timeout = setTimeout(() => {
+      if (waitingForDeposit) setWaitingForDeposit(false);
+      if (waitingForWithdrawal) setWaitingForWithdrawal(false);
+      clearInterval(aggressiveInterval);
+    }, POLL_DURATION);
+
+    return () => {
+      clearInterval(aggressiveInterval);
+      clearTimeout(timeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingForDeposit, waitingForWithdrawal]);
 
   return {
     state: {
@@ -416,6 +484,10 @@ export function useAppActions() {
       transactions,
       transactionsLoading,
       isCheckingDelegation,
+      enablingAutoBalancer,
+      autoBalancerJustEnabled,
+      depositingToVault,
+      waitingForDeposit: waitingForDeposit || waitingForWithdrawal,
     },
     actions: {
       setShowWithdrawModal,

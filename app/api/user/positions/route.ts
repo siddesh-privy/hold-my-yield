@@ -144,16 +144,12 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const userAddress = searchParams.get("address");
-    const bustCache = searchParams.has("t");
-
     if (!userAddress) {
       return NextResponse.json(
         { success: false, error: "Address parameter is required" },
         { status: 400 }
       );
     }
-
-    const cacheConfig = bustCache ? { revalidate: 0 } : { revalidate: 60 };
 
     const [morphoResponse, aaveResponse] = await Promise.all([
       fetch(MORPHO_API_URL, {
@@ -166,7 +162,7 @@ export async function GET(request: Request) {
             address: userAddress.toLowerCase(),
           },
         }),
-        next: cacheConfig,
+        cache: "no-store",
       }).catch((error) => {
         console.error("Error fetching Morpho positions:", error);
         return null;
@@ -182,7 +178,7 @@ export async function GET(request: Request) {
             chainId: BASE_CHAIN_ID,
           },
         }),
-        next: cacheConfig,
+        cache: "no-store",
       }).catch((error) => {
         console.error("Error fetching Aave positions:", error);
         return null;

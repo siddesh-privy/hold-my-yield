@@ -42,7 +42,7 @@ export async function GET(request: Request) {
           "privy-app-id": PRIVY_APP_ID,
           "Content-Type": "application/json",
         },
-        next: { revalidate: 10 }, // Cache for 10 seconds
+        cache: "no-store",
       }
     );
 

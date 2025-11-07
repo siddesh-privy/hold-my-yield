@@ -66,6 +66,9 @@ export async function POST(request: Request) {
       );
     }
 
+    // Wait for approval to be confirmed on-chain
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
     const depositTx = await depositUSDC(
       walletId,
       walletAddress,

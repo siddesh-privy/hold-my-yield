@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
     if (!protocol || protocol === "morpho") {
       fetchPromises.push(
-        fetch(`${baseUrl}/api/vaults/morpho`, { next: { revalidate: 300 } })
+        fetch(`${baseUrl}/api/vaults/morpho`, { cache: "no-store" })
           .then((res) => res.json())
           .catch((error) => {
             console.error("Error fetching Morpho vaults:", error);
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 
     if (!protocol || protocol === "aave") {
       fetchPromises.push(
-        fetch(`${baseUrl}/api/vaults/aave`, { next: { revalidate: 300 } })
+        fetch(`${baseUrl}/api/vaults/aave`, { cache: "no-store" })
           .then((res) => res.json())
           .catch((error) => {
             console.error("Error fetching Aave markets:", error);

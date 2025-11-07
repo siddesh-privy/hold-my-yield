@@ -69,7 +69,7 @@ export async function GET() {
           chainId: BASE_CHAIN_ID,
         },
       }),
-      next: { revalidate: 300 }, // Cache for 5 minutes
+      cache: "no-store",
     });
 
     const data = await response.json();

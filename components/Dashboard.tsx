@@ -12,11 +12,14 @@ interface DashboardProps {
   onShowVaults: () => void;
   onRefreshBalance: () => void;
   onClosePosition: () => void;
+  onDepositToVault: () => void;
+  depositingToVault: boolean;
   userPosition: UserPosition | null;
   positionLoading: boolean;
   closingPosition: boolean;
   transactions: Transaction[];
   transactionsLoading: boolean;
+  waitingForDeposit: boolean;
 }
 
 export function Dashboard({
@@ -29,11 +32,14 @@ export function Dashboard({
   onShowVaults,
   onRefreshBalance,
   onClosePosition,
+  onDepositToVault,
+  depositingToVault,
   userPosition,
   positionLoading,
   closingPosition,
   transactions,
   transactionsLoading,
+  waitingForDeposit,
 }: DashboardProps) {
   return (
     <div className="min-h-screen">
@@ -54,6 +60,22 @@ export function Dashboard({
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+              {parseFloat(walletBalance) > 0 && (
+                <button
+                  onClick={onDepositToVault}
+                  disabled={depositingToVault}
+                  className={`w-full sm:w-auto px-4 py-2 text-sm rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                    depositingToVault
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-green-600 text-white hover:bg-green-700"
+                  }`}
+                >
+                  {depositingToVault && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  )}
+                  {depositingToVault ? "Depositing..." : "Deposit to Vault"}
+                </button>
+              )}
               <button
                 onClick={onWithdraw}
                 className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors"
@@ -71,8 +93,16 @@ export function Dashboard({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             <div className="border rounded-lg p-4 sm:p-5 space-y-2 sm:space-y-3">
-              <div className="text-xs sm:text-sm text-gray-500">
-                Total Deposited
+              <div className="flex items-center gap-2">
+                <div className="text-xs sm:text-sm text-gray-500">
+                  Total Deposited
+                </div>
+                {waitingForDeposit && (
+                  <div className="flex items-center gap-1 text-xs text-blue-600">
+                    <div className="animate-spin rounded-full h-2.5 w-2.5 border-b-2 border-blue-600"></div>
+                    <span className="text-[10px]">Updating...</span>
+                  </div>
+                )}
               </div>
               <div className="text-2xl sm:text-3xl font-medium">
                 {positionLoading ? (
@@ -162,9 +192,17 @@ export function Dashboard({
 
           {/* Active Position Card */}
           <div className="border rounded-lg p-4 sm:p-6">
-            <h3 className="font-medium mb-3 sm:mb-4 text-sm sm:text-base">
-              Active Position
-            </h3>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="font-medium text-sm sm:text-base">
+                Active Position
+              </h3>
+              {waitingForDeposit && (
+                <div className="flex items-center gap-2 text-xs text-blue-600">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                  <span>Updating...</span>
+                </div>
+              )}
+            </div>
             {positionLoading ? (
               <div className="text-center py-6 sm:py-8 text-xs sm:text-sm text-gray-400">
                 Loading position...
@@ -253,9 +291,17 @@ export function Dashboard({
           </div>
 
           <div className="border rounded-lg p-4 sm:p-6">
-            <h3 className="font-medium mb-3 sm:mb-4 text-sm sm:text-base">
-              Recent Transactions
-            </h3>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="font-medium text-sm sm:text-base">
+                Recent Transactions
+              </h3>
+              {waitingForDeposit && (
+                <div className="flex items-center gap-2 text-xs text-blue-600">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                  <span>Updating...</span>
+                </div>
+              )}
+            </div>
             {transactionsLoading ? (
               <div className="text-center py-6 sm:py-8 text-xs sm:text-sm text-gray-400">
                 Loading transactions...

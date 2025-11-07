@@ -26,9 +26,8 @@ export function MainApp() {
         logout={actions.logout}
         onFundWallet={actions.handleFundWallet}
         onEnableAutoBalancer={actions.handleEnableAutoBalancer}
-        onDepositToVault={actions.handleDepositToVault}
-        bestAvailableApy={state.bestAvailableApy}
-        walletBalance={state.walletBalance}
+        enablingAutoBalancer={state.enablingAutoBalancer}
+        autoBalancerJustEnabled={state.autoBalancerJustEnabled}
       />
     );
   }
@@ -61,11 +60,14 @@ export function MainApp() {
         onShowVaults={() => actions.setShowVaultsModal(true)}
         onRefreshBalance={actions.fetchBalance}
         onClosePosition={actions.handleClosePosition}
+        onDepositToVault={actions.handleDepositToVault}
+        depositingToVault={state.depositingToVault}
         userPosition={state.userPosition}
         positionLoading={state.positionLoading}
         closingPosition={state.closingPosition}
         transactions={state.transactions}
         transactionsLoading={state.transactionsLoading}
+        waitingForDeposit={state.waitingForDeposit}
       />
     </>
   );
