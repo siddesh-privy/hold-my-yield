@@ -4,15 +4,21 @@ interface OnboardingViewProps {
   logout: () => void;
   onFundWallet: () => void;
   onEnableAutoBalancer: () => void;
-  onSkip: () => void;
+  onDepositToVault: () => void;
+  bestAvailableApy: number;
+  walletBalance: string;
 }
 
 export function OnboardingView({
   logout,
   onFundWallet,
   onEnableAutoBalancer,
-  onSkip,
+  onDepositToVault,
+  bestAvailableApy,
+  walletBalance,
 }: OnboardingViewProps) {
+  const hasBalance = parseFloat(walletBalance) > 0;
+
   return (
     <div className="min-h-screen">
       <Header logout={logout} />
@@ -24,7 +30,7 @@ export function OnboardingView({
               Get started
             </h1>
             <p className="text-sm sm:text-base text-gray-500">
-              Two simple steps to start earning optimized yields
+              Three simple steps to start earning optimized yields
             </p>
           </div>
 
@@ -75,17 +81,46 @@ export function OnboardingView({
                 </div>
               </div>
             </div>
-          </div>
 
+            {/* Step 3 */}
+            <div className="border rounded-lg p-4 sm:p-6 space-y-4">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black text-white flex items-center justify-center text-xs sm:text-sm font-medium shrink-0">
+                  3
+          </div>
+                <div className="flex-1">
+                  <h3 className="text-sm sm:text-base font-medium mb-2">
+                    Deposit to Highest APY Vault
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">
+                    Start earning{" "}
+                    <span className="font-semibold text-black">
+                      {bestAvailableApy.toFixed(2)}% APY
+                    </span>{" "}
+                    by depositing your funds into the best performing vault.
+                  </p>
+                  {!hasBalance && (
+                    <p className="text-xs sm:text-sm text-orange-600 mb-3 sm:mb-4">
+                      Please deposit USDC to continue
+                    </p>
+                  )}
           <button
-            onClick={onSkip}
-            className="text-xs sm:text-sm text-gray-500 hover:text-gray-900 transition-colors"
-          >
-            Skip for now
+                    onClick={onDepositToVault}
+                    disabled={!hasBalance}
+                    className={`w-full sm:w-auto px-4 py-2 text-xs sm:text-sm rounded-lg transition-colors ${
+                      hasBalance
+                        ? "bg-black text-white hover:bg-gray-800"
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
+                  >
+                    Deposit to Vault
           </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>
   );
 }
-

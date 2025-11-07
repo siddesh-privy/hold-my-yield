@@ -13,8 +13,8 @@ export interface Vault {
     name: string;
     decimals: number;
   };
-  apy: number; // As decimal (e.g., 0.0234 = 2.34%)
-  netApy: number; // APY after fees
+  apy: number; // Base APY (e.g., 0.0234 = 2.34%)
+  netApy: number; // APY including rewards minus fees
   totalAssetsUsd: number;
   metadata?: {
     image?: string;
@@ -30,9 +30,9 @@ export async function GET(request: Request) {
 
     // Fetch from both APIs in parallel
     const baseUrl = request.url.split("/api/vaults")[0];
-    
+
     const fetchPromises = [];
-    
+
     if (!protocol || protocol === "morpho") {
       fetchPromises.push(
         fetch(`${baseUrl}/api/vaults/morpho`, { next: { revalidate: 300 } })
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
           })
       );
     }
-    
+
     if (!protocol || protocol === "aave") {
       fetchPromises.push(
         fetch(`${baseUrl}/api/vaults/aave`, { next: { revalidate: 300 } })
@@ -63,49 +63,68 @@ export async function GET(request: Request) {
     results.forEach((result) => {
       if (!result.success) return;
 
-      // Handle Morpho vaults
       if (result.vaults) {
-        result.vaults.forEach((vault: any) => {
-          allVaults.push({
-            id: `morpho:${vault.address}`,
-            protocol: "morpho",
-            name: vault.name,
-            address: vault.address,
-            marketAddress: vault.address,
-            asset: vault.asset,
-            apy: vault.apy,
-            netApy: vault.netApy,
-            totalAssetsUsd: vault.totalAssetsUsd,
-            metadata: {
-              image: vault.image,
-              description: vault.description,
-              fee: vault.fee,
-            },
-          });
-        });
+        result.vaults.forEach(
+          (vault: {
+            address: string;
+            name: string;
+            asset: Vault["asset"];
+            apy: number;
+            netApy: number;
+            totalAssetsUsd: number;
+            image?: string;
+            description?: string;
+            fee?: number;
+          }) => {
+            allVaults.push({
+              id: `morpho:${vault.address}`,
+              protocol: "morpho",
+              name: vault.name,
+              address: vault.address,
+              marketAddress: vault.address,
+              asset: vault.asset,
+              apy: vault.apy,
+              netApy: vault.netApy,
+              totalAssetsUsd: vault.totalAssetsUsd,
+              metadata: {
+                image: vault.image,
+                description: vault.description,
+                fee: vault.fee,
+              },
+            });
+          }
+        );
       }
 
-      // Handle Aave markets
       if (result.markets) {
-        result.markets.forEach((market: any) => {
-          allVaults.push({
-            id: `aave-v3:${market.marketAddress}`,
-            protocol: "aave-v3",
-            name: market.name,
-            address: market.address,
-            marketAddress: market.marketAddress,
-            asset: market.asset,
-            apy: market.apy,
-            netApy: market.netApy,
-            totalAssetsUsd: market.totalAssetsUsd,
-            metadata: {},
-          });
-        });
+        result.markets.forEach(
+          (market: {
+            address: string;
+            name: string;
+            marketAddress: string;
+            asset: Vault["asset"];
+            apy: number;
+            netApy: number;
+            totalAssetsUsd: number;
+          }) => {
+            allVaults.push({
+              id: `aave-v3:${market.marketAddress}`,
+              protocol: "aave-v3",
+              name: market.name,
+              address: market.address,
+              marketAddress: market.marketAddress,
+              asset: market.asset,
+              apy: market.apy,
+              netApy: market.netApy,
+              totalAssetsUsd: market.totalAssetsUsd,
+              metadata: {},
+            });
+          }
+        );
       }
     });
 
-    // Sort by totalAssetsUsd (highest liquidity first)
-    allVaults.sort((a, b) => b.totalAssetsUsd - a.totalAssetsUsd);
+    allVaults.sort((a, b) => b.netApy - a.netApy);
 
     return NextResponse.json({
       success: true,
@@ -128,4 +147,3 @@ export async function GET(request: Request) {
     );
   }
 }
-

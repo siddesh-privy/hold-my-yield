@@ -1,25 +1,39 @@
 import { Header } from "./Header";
+import type { UserPosition } from "@/app/api/user/positions/route";
+import type { Transaction } from "@/app/api/user/transactions/route";
 
 interface DashboardProps {
   logout: () => void;
-  autoBalancerEnabled: boolean;
   walletBalance: string;
   balanceLoading: boolean;
+  bestAvailableApy: number;
   onWithdraw: () => void;
   onAddFunds: () => void;
-  onToggleAutoBalancer: () => void;
   onShowVaults: () => void;
+  onRefreshBalance: () => void;
+  onClosePosition: () => void;
+  userPosition: UserPosition | null;
+  positionLoading: boolean;
+  closingPosition: boolean;
+  transactions: Transaction[];
+  transactionsLoading: boolean;
 }
 
 export function Dashboard({
   logout,
-  autoBalancerEnabled,
   walletBalance,
   balanceLoading,
+  bestAvailableApy,
   onWithdraw,
   onAddFunds,
-  onToggleAutoBalancer,
   onShowVaults,
+  onRefreshBalance,
+  onClosePosition,
+  userPosition,
+  positionLoading,
+  closingPosition,
+  transactions,
+  transactionsLoading,
 }: DashboardProps) {
   return (
     <div className="min-h-screen">
@@ -49,18 +63,6 @@ export function Dashboard({
               >
                 Add Funds
               </button>
-              <button
-                onClick={onToggleAutoBalancer}
-                className={`w-full sm:w-auto px-4 py-2 text-sm rounded-lg transition-colors whitespace-nowrap ${
-                  autoBalancerEnabled
-                    ? "border border-gray-300 text-gray-700 hover:bg-gray-50"
-                    : "border border-black text-black hover:bg-gray-50"
-                }`}
-              >
-                {autoBalancerEnabled
-                  ? "Disable Auto Balancer"
-                  : "Enable Auto Balancer"}
-              </button>
             </div>
           </div>
 
@@ -69,12 +71,44 @@ export function Dashboard({
               <div className="text-xs sm:text-sm text-gray-500">
                 Total Deposited
               </div>
-              <div className="text-2xl sm:text-3xl font-medium">$0.00</div>
+              <div className="text-2xl sm:text-3xl font-medium">
+                {positionLoading ? (
+                  <span className="text-gray-400">Loading...</span>
+                ) : userPosition ? (
+                  `$${userPosition.deposited.formatted}`
+                ) : (
+                  "$0.00"
+                )}
+              </div>
             </div>
 
             <div className="border rounded-lg p-4 sm:p-5 space-y-2 sm:space-y-3">
-              <div className="text-xs sm:text-sm text-gray-500">
-                Wallet USDC Balance
+              <div className="flex items-center justify-between">
+                <div className="text-xs sm:text-sm text-gray-500">
+                  Wallet USDC Balance
+                </div>
+                <button
+                  onClick={onRefreshBalance}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Refresh balance"
+                  disabled={balanceLoading}
+                >
+                  <svg
+                    className={`w-4 h-4 ${
+                      balanceLoading ? "animate-spin" : ""
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                </button>
               </div>
               <div className="text-2xl sm:text-3xl font-medium">
                 {balanceLoading ? (
@@ -85,15 +119,15 @@ export function Dashboard({
               </div>
             </div>
 
-            <div className="border rounded-lg p-4 sm:p-5 space-y-2 sm:space-y-3">
+            <div className="border rounded-lg p-4 sm:p-5 space-y-2 sm:space-y-3 bg-green-50">
               <div className="flex items-center justify-between">
-                <div className="text-xs sm:text-sm text-gray-500">
-                  Current Yield
+                <div className="text-xs sm:text-sm text-green-700 font-medium">
+                  Current APY
                 </div>
                 <button
                   onClick={onShowVaults}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                  title="View available markets"
+                  className="text-green-600 hover:text-green-800 transition-colors"
+                  title="View all markets"
                 >
                   <svg
                     className="w-4 h-4"
@@ -110,17 +144,169 @@ export function Dashboard({
                   </svg>
                 </button>
               </div>
-              <div className="text-2xl sm:text-3xl font-medium">0.00%</div>
+              <div className="text-2xl sm:text-3xl font-medium text-green-600">
+                {bestAvailableApy !== undefined ? (
+                  `${bestAvailableApy.toFixed(2)}%`
+                ) : (
+                  <span className="text-green-400">--</span>
+                )}
+              </div>
+              <div className="text-xs text-green-600">
+                Earning highest yield
+              </div>
             </div>
+          </div>
+
+          {/* Active Position Card */}
+          <div className="border rounded-lg p-4 sm:p-6">
+            <h3 className="font-medium mb-3 sm:mb-4 text-sm sm:text-base">
+              Active Position
+            </h3>
+            {positionLoading ? (
+              <div className="text-center py-6 sm:py-8 text-xs sm:text-sm text-gray-400">
+                Loading position...
+              </div>
+            ) : userPosition ? (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium text-sm sm:text-base">
+                        {userPosition.vaultName}
+                      </h4>
+                      <span className="px-2 py-0.5 text-xs bg-black text-white rounded">
+                        {userPosition.protocol === "morpho"
+                          ? "Morpho"
+                          : "Aave V3"}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-gray-600">
+                      <div>
+                        <span className="text-gray-500">Deposited:</span>{" "}
+                        <span className="font-medium">
+                          ${userPosition.deposited.formatted}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Current APY:</span>{" "}
+                        <span className="font-medium text-green-600">
+                          {(
+                            (userPosition.netApy || userPosition.currentApy) *
+                            100
+                          ).toFixed(2)}
+                          %
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">
+                          Est. Yearly Yield:
+                        </span>{" "}
+                        <span className="font-medium text-green-600">
+                          ${userPosition.estimatedYearlyYield.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={onClosePosition}
+                    disabled={closingPosition}
+                    className="w-full sm:w-auto px-4 py-2 border border-red-300 text-red-600 text-sm rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap flex items-center justify-center gap-2"
+                  >
+                    {closingPosition ? (
+                      <>
+                        <svg
+                          className="animate-spin h-4 w-4"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        <span>Closing...</span>
+                      </>
+                    ) : (
+                      "Close Position"
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 sm:py-8 text-xs sm:text-sm text-gray-500">
+                No active positions yet
+              </div>
+            )}
           </div>
 
           <div className="border rounded-lg p-4 sm:p-6">
             <h3 className="font-medium mb-3 sm:mb-4 text-sm sm:text-base">
-              Transactions
+              Recent Transactions
             </h3>
-            <div className="text-center py-6 sm:py-8 text-xs sm:text-sm text-gray-500">
-              No transactions yet
-            </div>
+            {transactionsLoading ? (
+              <div className="text-center py-6 sm:py-8 text-xs sm:text-sm text-gray-400">
+                Loading transactions...
+              </div>
+            ) : transactions.length > 0 ? (
+              <div className="space-y-3">
+                {transactions.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-0.5 text-xs font-medium rounded ${
+                            tx.type === "deposit"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-orange-100 text-orange-700"
+                          }`}
+                        >
+                          {tx.type === "deposit" ? "Deposit" : "Withdraw"}
+                        </span>
+                        <span className="px-2 py-0.5 text-xs bg-black text-white rounded">
+                          {tx.protocol === "morpho" ? "Morpho" : "Aave V3"}
+                        </span>
+                      </div>
+                      <div className="text-xs sm:text-sm text-gray-600">
+                        {tx.vaultName}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(tx.timestamp * 1000).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2">
+                      <div className="text-sm font-medium">
+                        ${tx.amount.formatted}
+                      </div>
+                      <a
+                        href={`https://basescan.org/tx/${tx.hash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:text-blue-800 underline"
+                      >
+                        View
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 sm:py-8 text-xs sm:text-sm text-gray-500">
+                No transactions yet
+              </div>
+            )}
           </div>
         </div>
       </main>

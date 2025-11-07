@@ -54,17 +54,12 @@ export async function GET(request: Request) {
 
     const data: BalanceResponse = await response.json();
 
-    console.log("Privy balance response:", JSON.stringify(data, null, 2));
-
     // Find USDC balance on Base
     const usdcBalance = data.balances.find(
       (balance) => balance.chain === "base" && balance.asset === "usdc"
     );
 
-    console.log("Found USDC balance:", usdcBalance);
-
     if (!usdcBalance) {
-      console.log("No USDC balance found on Base");
       return NextResponse.json({
         success: true,
         balance: {
@@ -82,8 +77,6 @@ export async function GET(request: Request) {
       formatted: usdcBalance.display_values.usdc || "0.00",
       usd: usdcBalance.display_values.usd || "0.00",
     };
-
-    console.log("Returning formatted balance:", formattedBalance);
 
     return NextResponse.json({
       success: true,

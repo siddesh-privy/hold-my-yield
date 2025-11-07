@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-
-const MORPHO_API_URL = "https://api.morpho.org/graphql";
-const BASE_CHAIN_ID = 8453;
-const USDC_BASE_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // USDC on Base
+import { MORPHO_API_URL, BASE_CHAIN_ID, USDC_ADDRESS } from "@/lib/CONSTANTS";
 
 interface VaultAsset {
   address: string;
@@ -33,14 +30,16 @@ interface Vault {
   metadata?: VaultMetadata;
 }
 
-// GraphQL query to fetch vaults
 const VAULTS_QUERY = `
-  query GetVaults($chainId: Int!) {
+  query GetVaults($chainId: Int!, $assetAddress: String!) {
     vaults(
       where: {
         chainId_in: [$chainId]
+        assetAddress_in: [$assetAddress]
       }
-      first: 1000
+      orderBy: TotalAssetsUsd
+      orderDirection: Desc
+      first: 50
     ) {
       items {
         address
@@ -79,6 +78,7 @@ export async function GET() {
         query: VAULTS_QUERY,
         variables: {
           chainId: BASE_CHAIN_ID,
+          assetAddress: USDC_ADDRESS,
         },
       }),
       next: { revalidate: 300 }, // Cache for 5 minutes
@@ -98,23 +98,13 @@ export async function GET() {
 
     const vaults = (data.data?.vaults?.items || []) as Vault[];
 
-    // Filter for USDC vaults with APY >= 1% and liquidity > $1M, sorted by AUM
-    const usdcVaults = vaults
-      .filter(
-        (vault) =>
-          vault.asset.address.toLowerCase() ===
-            USDC_BASE_ADDRESS.toLowerCase() &&
-          (vault.state?.netApy || 0) >= 0.01 && // APY >= 1%
-          (vault.state?.totalAssetsUsd || 0) > 1000000 // Liquidity > $1M
-      )
-      .sort((a, b) => {
-        const aUsd = parseFloat(String(a.state?.totalAssetsUsd || "0"));
-        const bUsd = parseFloat(String(b.state?.totalAssetsUsd || "0"));
-        return bUsd - aUsd;
-      });
+    const filteredVaults = vaults.filter(
+      (vault) =>
+        (vault.state?.apy || 0) >= 0.01 &&
+        (vault.state?.totalAssetsUsd || 0) > 1000000
+    );
 
-    // Format the response
-    const formattedVaults = usdcVaults.map((vault) => ({
+    const formattedVaults = filteredVaults.map((vault) => ({
       address: vault.address,
       name: vault.name,
       symbol: vault.symbol,

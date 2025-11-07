@@ -3,9 +3,14 @@ import { useState } from "react";
 interface WithdrawModalProps {
   onClose: () => void;
   onSubmit: (address: string, amount: string) => Promise<void>;
+  walletBalance: string;
 }
 
-export function WithdrawModal({ onClose, onSubmit }: WithdrawModalProps) {
+export function WithdrawModal({
+  onClose,
+  onSubmit,
+  walletBalance,
+}: WithdrawModalProps) {
   const [withdrawAddress, setWithdrawAddress] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
 
@@ -16,6 +21,10 @@ export function WithdrawModal({ onClose, onSubmit }: WithdrawModalProps) {
     await onSubmit(withdrawAddress, withdrawAmount);
     setWithdrawAddress("");
     setWithdrawAmount("");
+  };
+
+  const handleMaxClick = () => {
+    setWithdrawAmount(walletBalance);
   };
 
   return (
@@ -69,19 +78,31 @@ export function WithdrawModal({ onClose, onSubmit }: WithdrawModalProps) {
             >
               Amount (USDC)
             </label>
-            <input
-              id="amount"
-              type="number"
-              step="0.01"
-              min="0"
-              value={withdrawAmount}
-              onChange={(e) => setWithdrawAmount(e.target.value)}
-              placeholder="0.00"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-              required
-            />
+            <div className="relative">
+              <input
+                id="amount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 pr-16 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                required
+              />
+              <button
+                type="button"
+                onClick={handleMaxClick}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 text-xs font-medium text-black bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+              >
+                Max
+              </button>
+            </div>
           </div>
 
+          <div className="text-xs text-gray-500">
+            Available balance: {walletBalance} USDC
+          </div>
           <div className="flex gap-2 sm:gap-3 pt-2">
             <button
               type="button"
@@ -92,7 +113,8 @@ export function WithdrawModal({ onClose, onSubmit }: WithdrawModalProps) {
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-black text-white text-xs sm:text-sm rounded-lg hover:bg-gray-800 transition-colors"
+              disabled={Number(walletBalance) === 0}
+              className="flex-1 px-4 py-2 bg-black text-white text-xs sm:text-sm rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Withdraw
             </button>
@@ -102,4 +124,3 @@ export function WithdrawModal({ onClose, onSubmit }: WithdrawModalProps) {
     </div>
   );
 }
-

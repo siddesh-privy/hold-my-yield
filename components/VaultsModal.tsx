@@ -51,35 +51,40 @@ export function VaultsModal({ vaults, loading, onClose }: VaultsModalProps) {
           ) : (
             <div className="space-y-3">
               {vaults.map((vault) => (
-                <div
-                  key={vault.id}
-                  className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full font-medium uppercase">
-                          {vault.protocol}
-                        </span>
-                        <h4 className="text-sm font-medium truncate">
-                          {vault.name}
-                        </h4>
+                  <div
+                    key={vault.id}
+                    className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full font-medium uppercase">
+                            {vault.protocol}
+                          </span>
+                          <h4 className="text-sm font-medium truncate">
+                            {vault.name}
+                          </h4>
+                        </div>
+                        <p className="text-xs text-gray-500 truncate">
+                          {vault.asset.symbol} • $
+                          {(vault.totalAssetsUsd / 1000000).toFixed(2)}M
+                          liquidity
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-500 truncate">
-                        {vault.asset.symbol} • $
-                        {(vault.totalAssetsUsd / 1000000).toFixed(2)}M
-                        liquidity
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-sm font-medium text-green-600">
-                        {(vault.netApy * 100).toFixed(2)}%
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-medium text-green-600">
+                          {(vault.apy * 100).toFixed(2)}%
+                        </div>
+                        {vault.netApy > vault.apy && (
+                          <div className="text-xs text-green-500">
+                            +{((vault.netApy - vault.apy) * 100).toFixed(2)}% rewards
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-500">APY</div>
                       </div>
-                      <div className="text-xs text-gray-500">APY</div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </div>
@@ -99,4 +104,3 @@ export function VaultsModal({ vaults, loading, onClose }: VaultsModalProps) {
     </div>
   );
 }
-

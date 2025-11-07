@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-
-const AAVE_API_URL = "https://api.v3.aave.com/graphql";
-const BASE_CHAIN_ID = 8453;
-const USDC_BASE_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+import { AAVE_API_URL, BASE_CHAIN_ID, USDC_ADDRESS } from "@/lib/CONSTANTS";
 
 interface AaveReserve {
   underlyingToken: {
@@ -113,7 +110,7 @@ export async function GET() {
         .filter(
           (reserve) =>
             reserve.underlyingToken.address.toLowerCase() ===
-            USDC_BASE_ADDRESS.toLowerCase()
+            USDC_ADDRESS.toLowerCase()
         )
         .forEach((reserve) => {
           // Parse APY from value field (already in decimal format)

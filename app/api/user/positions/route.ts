@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-
-const MORPHO_API_URL = "https://api.morpho.org/graphql";
-const AAVE_API_URL = "https://api.v3.aave.com/graphql";
-const BASE_CHAIN_ID = 8453;
-const USDC_BASE_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+import {
+  MORPHO_API_URL,
+  AAVE_API_URL,
+  BASE_CHAIN_ID,
+  USDC_ADDRESS,
+} from "@/lib/CONSTANTS";
 
 // Normalized position interface
 export interface UserPosition {
@@ -18,11 +19,13 @@ export interface UserPosition {
     decimals: number;
   };
   deposited: {
-    amount: string; // Raw amount
+    amount: string; // Raw amount (for aave) or shares (for morpho)
     formatted: string; // Human readable
     usd: number;
   };
+  shares?: string; // Morpho-specific: vault shares owned
   currentApy: number;
+  netApy?: number; // APY including rewards
   estimatedYearlyYield: number; // In USD
 }
 
@@ -37,11 +40,13 @@ interface MorphoVaultPosition {
       decimals: number;
     };
     state: {
+      apy: number;
       netApy: number;
     };
   };
-  totalAssets: string;
-  totalAssetsUsd: number;
+  shares: string;
+  assets: string;
+  assetsUsd: number;
 }
 
 interface AaveReserve {
@@ -76,8 +81,9 @@ interface AaveMarket {
 }
 
 const MORPHO_USER_POSITIONS_QUERY = `
-  query GetUserPositions($address: String!, $chainId: Int!) {
-    user(address: $address, chainId: $chainId) {
+  query GetUserPositions($chainId: Int!, $address: String!) {
+    userByAddress(chainId: $chainId, address: $address) {
+      address
       vaultPositions {
         vault {
           address
@@ -89,11 +95,13 @@ const MORPHO_USER_POSITIONS_QUERY = `
             decimals
           }
           state {
+            apy
             netApy
           }
         }
-        totalAssets
-        totalAssetsUsd
+        shares
+        assets
+        assetsUsd
       }
     }
   }
@@ -136,6 +144,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const userAddress = searchParams.get("address");
+    const bustCache = searchParams.has("t");
 
     if (!userAddress) {
       return NextResponse.json(
@@ -144,7 +153,8 @@ export async function GET(request: Request) {
       );
     }
 
-    // Fetch from both APIs in parallel
+    const cacheConfig = bustCache ? { revalidate: 0 } : { revalidate: 60 };
+
     const [morphoResponse, aaveResponse] = await Promise.all([
       fetch(MORPHO_API_URL, {
         method: "POST",
@@ -152,11 +162,11 @@ export async function GET(request: Request) {
         body: JSON.stringify({
           query: MORPHO_USER_POSITIONS_QUERY,
           variables: {
-            address: userAddress.toLowerCase(),
             chainId: BASE_CHAIN_ID,
+            address: userAddress.toLowerCase(),
           },
         }),
-        next: { revalidate: 60 }, // Cache for 1 minute
+        next: cacheConfig,
       }).catch((error) => {
         console.error("Error fetching Morpho positions:", error);
         return null;
@@ -172,7 +182,7 @@ export async function GET(request: Request) {
             chainId: BASE_CHAIN_ID,
           },
         }),
-        next: { revalidate: 60 }, // Cache for 1 minute
+        next: cacheConfig,
       }).catch((error) => {
         console.error("Error fetching Aave positions:", error);
         return null;
@@ -188,18 +198,19 @@ export async function GET(request: Request) {
       if (morphoData.errors) {
         console.error("Morpho GraphQL errors:", morphoData.errors);
       } else {
-        const vaultPositions = (morphoData.data?.user?.vaultPositions ||
-          []) as MorphoVaultPosition[];
+        const vaultPositions = (morphoData.data?.userByAddress
+          ?.vaultPositions || []) as MorphoVaultPosition[];
 
         vaultPositions
           .filter(
             (pos) =>
               pos.vault.asset.address.toLowerCase() ===
-              USDC_BASE_ADDRESS.toLowerCase()
+                USDC_ADDRESS.toLowerCase() && parseFloat(pos.assets) > 0
           )
           .forEach((pos) => {
-            const apy = pos.vault.state.netApy;
-            const estimatedYearlyYield = pos.totalAssetsUsd * apy;
+            const apy = pos.vault.state.apy;
+            const netApy = pos.vault.state.netApy;
+            const estimatedYearlyYield = pos.assetsUsd * apy;
 
             allPositions.push({
               id: `morpho:${pos.vault.address}`,
@@ -208,14 +219,16 @@ export async function GET(request: Request) {
               vaultName: pos.vault.name,
               asset: pos.vault.asset,
               deposited: {
-                amount: pos.totalAssets,
+                amount: pos.shares, // Store shares in amount for Morpho
                 formatted: (
-                  parseFloat(pos.totalAssets) /
+                  parseFloat(pos.assets) /
                   Math.pow(10, pos.vault.asset.decimals)
                 ).toFixed(2),
-                usd: pos.totalAssetsUsd,
+                usd: pos.assetsUsd,
               },
+              shares: pos.shares, // Morpho vault shares
               currentApy: apy,
+              netApy: netApy,
               estimatedYearlyYield,
             });
           });
@@ -246,7 +259,7 @@ export async function GET(request: Request) {
           const usdcReserve = reserves.find(
             (reserve) =>
               reserve.underlyingToken.address.toLowerCase() ===
-              USDC_BASE_ADDRESS.toLowerCase()
+              USDC_ADDRESS.toLowerCase()
           );
 
           if (!usdcReserve) {
